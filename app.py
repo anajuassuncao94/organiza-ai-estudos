@@ -27,15 +27,30 @@ def q(sql, params=(), fetch=False):
 
 def setup():
     c = conn(); cur = c.cursor()
-    cur.execute("""CREATE TABLE IF NOT EXISTS usuarios (
-        id SERIAL PRIMARY KEY, usuario TEXT UNIQUE NOT NULL, senha TEXT NOT NULL)""")
-    cur.execute("""CREATE TABLE IF NOT EXISTS horarios (
-        id SERIAL PRIMARY KEY, usuario TEXT NOT NULL,
-        dia TEXT NOT NULL, inicio TEXT NOT NULL, fim TEXT NOT NULL)""")
-    cur.execute("""CREATE TABLE IF NOT EXISTS disciplinas (
-        id SERIAL PRIMARY KEY, usuario TEXT NOT NULL,
-        nome TEXT NOT NULL, prioridade TEXT NOT NULL DEFAULT 'Alta', horas_semana INTEGER NOT NULL)""")
-    c.commit(); c.close()
+    try:
+        # Criar tabela de usuários
+        cur.execute("""CREATE TABLE IF NOT EXISTS usuarios (
+            id SERIAL PRIMARY KEY, usuario TEXT UNIQUE NOT NULL, senha TEXT NOT NULL)""")
+        
+        # Verificar se coluna 'senha' existe, se não existir adiciona
+        cur.execute("""SELECT column_name FROM information_schema.columns 
+                      WHERE table_name='usuarios' AND column_name='senha'""")
+        if not cur.fetchone():
+            cur.execute("ALTER TABLE usuarios ADD COLUMN senha TEXT NOT NULL DEFAULT ''")
+        
+        # Criar tabelas de horários e disciplinas
+        cur.execute("""CREATE TABLE IF NOT EXISTS horarios (
+            id SERIAL PRIMARY KEY, usuario TEXT NOT NULL,
+            dia TEXT NOT NULL, inicio TEXT NOT NULL, fim TEXT NOT NULL)""")
+        cur.execute("""CREATE TABLE IF NOT EXISTS disciplinas (
+            id SERIAL PRIMARY KEY, usuario TEXT NOT NULL,
+            nome TEXT NOT NULL, prioridade TEXT NOT NULL DEFAULT 'Alta', horas_semana INTEGER NOT NULL)""")
+        
+        c.commit()
+    except Exception as e:
+        st.error(f"Erro ao configurar banco: {e}")
+    finally:
+        c.close()
 
 setup()
 
@@ -45,11 +60,20 @@ def cadastrar(u, s):
     try:
         q("INSERT INTO usuarios (usuario, senha) VALUES (%s,%s)", (u, hash_s(s)))
         return True, "Cadastro realizado!"
-    except: return False, "Usuário já existe."
+    except Exception as e:
+        if "unique constraint" in str(e).lower():
+            return False, "Usuário já existe."
+        return False, f"Erro ao cadastrar: {str(e)}"
 
 def logar(u, s):
-    rows = q("SELECT senha FROM usuarios WHERE usuario=%s", (u,), fetch=True)
-    return rows and rows[0]["senha"] == hash_s(s)
+    try:
+        rows = q("SELECT senha FROM usuarios WHERE usuario=%s", (u,), fetch=True)
+        if not rows:
+            return False
+        return rows[0]["senha"] == hash_s(s)
+    except Exception as e:
+        st.error(f"Erro ao fazer login: {str(e)}")
+        return False
 
 if "usuario" not in st.session_state:
     st.session_state.usuario = None
