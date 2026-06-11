@@ -1,0 +1,15 @@
+[client]
+showErrorDetails = true
+showWarningOnDirectoryDelete = false
+
+[logger]
+level = "info"
+
+[runner]
+magicEnabled = true
+fastReruns = true
+
+[server]
+headless = true
+runOnSave = true
+port = 8501
