@@ -28,24 +28,34 @@ def q(sql, params=(), fetch=False):
 def setup():
     c = conn(); cur = c.cursor()
     try:
-        # Criar tabela de usuários
+        # Criar tabelas principais
         cur.execute("""CREATE TABLE IF NOT EXISTS usuarios (
-            id SERIAL PRIMARY KEY, usuario TEXT UNIQUE NOT NULL, senha TEXT NOT NULL)""")
-        
-        # Verificar se coluna 'senha' existe, se não existir adiciona
-        cur.execute("""SELECT column_name FROM information_schema.columns 
-                      WHERE table_name='usuarios' AND column_name='senha'""")
-        if not cur.fetchone():
-            cur.execute("ALTER TABLE usuarios ADD COLUMN senha TEXT NOT NULL DEFAULT ''")
-        
-        # Criar tabelas de horários e disciplinas
+            id SERIAL PRIMARY KEY,
+            usuario TEXT UNIQUE NOT NULL,
+            senha TEXT NOT NULL)""")
         cur.execute("""CREATE TABLE IF NOT EXISTS horarios (
             id SERIAL PRIMARY KEY, usuario TEXT NOT NULL,
             dia TEXT NOT NULL, inicio TEXT NOT NULL, fim TEXT NOT NULL)""")
         cur.execute("""CREATE TABLE IF NOT EXISTS disciplinas (
             id SERIAL PRIMARY KEY, usuario TEXT NOT NULL,
             nome TEXT NOT NULL, prioridade TEXT NOT NULL DEFAULT 'Alta', horas_semana INTEGER NOT NULL)""")
-        
+
+        # Ajustar schema existente de usuarios com colunas extras
+        cur.execute("""SELECT column_name, is_nullable
+                      FROM information_schema.columns
+                      WHERE table_name='usuarios'""")
+        cols = {row[0]: row[1] for row in cur.fetchall()}
+
+        if 'usuario' not in cols:
+            cur.execute("ALTER TABLE usuarios ADD COLUMN usuario TEXT UNIQUE NOT NULL DEFAULT ''")
+        if 'senha' not in cols:
+            cur.execute("ALTER TABLE usuarios ADD COLUMN senha TEXT NOT NULL DEFAULT ''")
+
+        # Permitir colunas extras herdadas por compatibilidade
+        for extra in cols:
+            if extra not in {'id', 'usuario', 'senha'}:
+                cur.execute(f"ALTER TABLE usuarios ALTER COLUMN {extra} DROP NOT NULL")
+
         c.commit()
     except Exception as e:
         st.error(f"Erro ao configurar banco: {e}")
@@ -56,9 +66,9 @@ setup()
 
 def hash_s(s): return hashlib.sha256(s.encode()).hexdigest()
 
-def cadastrar(u, s):
+def cadastrar(nome, u, s):
     try:
-        q("INSERT INTO usuarios (usuario, senha) VALUES (%s,%s)", (u, hash_s(s)))
+        q("INSERT INTO usuarios (nome, usuario, senha) VALUES (%s,%s,%s)", (nome, u, hash_s(s)))
         return True, "Cadastro realizado!"
     except Exception as e:
         if "unique constraint" in str(e).lower():
@@ -103,15 +113,16 @@ if not st.session_state.usuario:
                     st.error("Usuário ou senha incorretos.")
         else:
             st.markdown("### Crie sua conta")
+            nome = st.text_input("Nome", placeholder="Seu nome completo")
             u = st.text_input("Usuário", placeholder="Escolha um usuário")
             s = st.text_input("Senha", type="password", placeholder="Mínimo 6 caracteres")
             s2 = st.text_input("Confirmar senha", type="password", placeholder="Repita a senha")
             if st.button("Criar conta →", use_container_width=True, type="primary"):
-                if not u or not s: st.error("Preencha todos os campos.")
+                if not nome or not u or not s: st.error("Preencha todos os campos.")
                 elif len(s) < 6: st.error("Senha muito curta.")
                 elif s != s2: st.error("As senhas não coincidem.")
                 else:
-                    ok, msg = cadastrar(u, s)
+                    ok, msg = cadastrar(nome.strip(), u, s)
                     st.success(msg) if ok else st.error(msg)
     st.stop()
 
