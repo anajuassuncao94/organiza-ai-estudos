@@ -54,6 +54,10 @@ def listar_disciplinas(usuario):
 def remover_disciplina(disciplina_id):
     executar("DELETE FROM disciplinas WHERE id = %s", (disciplina_id,))
 
+def atualizar_disciplina(disciplina_id, nome, prioridade, horas_semana):
+    executar("UPDATE disciplinas SET nome=%s, prioridade=%s, horas_semana=%s WHERE id=%s",
+              (nome, prioridade, horas_semana, disciplina_id))
+
 
 # Horários
 def salvar_horario(usuario, dia, inicio, fim):
