@@ -28,8 +28,29 @@ if not lista:
     st.info("Nenhuma disciplina cadastrada ainda.")
 else:
     for d in lista:
-        col1, col2 = st.columns([5, 1])
+        col1, col2, col3 = st.columns([5, 1, 1])
         col1.write(f"**{d['nome']}** — {d['prioridade']} · {d['horas_semana']}h/semana")
-        if col2.button("Remover", key=f"r{d['id']}"):
+
+        if col2.button("Editar", key=f"e{d['id']}"):
+            st.session_state.editando_id = d["id"]
+
+        if col3.button("Remover", key=f"r{d['id']}"):
             disciplinas.excluir_disciplina(d["id"])
             st.rerun()
+
+        # Formulário de edição aparece só para a disciplina selecionada
+        if st.session_state.get("editando_id") == d["id"]:
+            with st.form(f"form_edicao_{d['id']}"):
+                c1, c2, c3 = st.columns([3, 1.5, 1])
+                novo_nome = c1.text_input("Nome", value=d["nome"])
+                nova_prioridade = c2.selectbox(
+                    "Prioridade", ["🔴 Alta", "🟡 Média", "🟢 Baixa"],
+                    index=["🔴 Alta", "🟡 Média", "🟢 Baixa"].index(d["prioridade"])
+                )
+                novas_horas = c3.number_input("Horas/semana", min_value=1, max_value=40, value=d["horas_semana"])
+
+                if st.form_submit_button("Salvar alterações", type="primary"):
+                    disciplinas.editar_disciplina(d["id"], novo_nome.strip(), nova_prioridade, novas_horas)
+                    st.session_state.editando_id = None
+                    st.rerun()
+
