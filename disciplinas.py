@@ -6,7 +6,6 @@ import database
 def adicionar_disciplina(usuario, nome, prioridade, horas_semana):
     database.salvar_disciplina(usuario, nome, prioridade, horas_semana)
 
-
 def obter_disciplinas(usuario):
     return database.listar_disciplinas(usuario)
 
